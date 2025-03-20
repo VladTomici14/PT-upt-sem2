@@ -104,7 +104,6 @@ int process_csv(const char *filename, DataEntry *entries, int max_entries) {
         }
 
         DataEntry lineEntry;
-//        printf("1%s\n", line);
 
         // FIXME: the reading is not done -- the line entry variable does not save any value at all
 
@@ -170,35 +169,6 @@ int main() {
                i + 1, entries[i].city_name, entries[i].temp,
                entries[i].dt_iso.year, entries[i].dt_iso.month, entries[i].dt_iso.day,
                entries[i].dt_iso.hour, entries[i].dt_iso.minute, entries[i].dt_iso.second);
-
-//        printf("%19s,%d,%99[^,],%lf,%lf,%f,%d,%f,%f,%f,%f,%f,%d,%d,%d,%d,%f,%d,%f,%f,%f,%f,%d,%d,%99[^,],%99[^,],%9s\n",
-//               entries[i].dt,
-//               &entries[i].timezone,
-//               entries[i].city_name,
-//               &entries[i].lat,
-//               &entries[i].lon,
-//               &entries[i].temp,
-//               &entries[i].visibility,
-//               &entries[i].dew_point,
-//               &entries[i].feels_like,
-//               &entries[i].temp_min,
-//               &entries[i].temp_max,
-//               &entries[i].pressure,
-//               &entries[i].sea_level,
-//               &entries[i].grnd_level,
-//               &entries[i].humidity,
-//               &entries[i].wind_speed,
-//               &entries[i].wind_deg,
-//               &entries[i].wind_gust,
-//               &entries[i].rain_1h,
-//               &entries[i].rain_3h,
-//               &entries[i].snow_1h,
-//               &entries[i].snow_3h,
-//               &entries[i].clouds_all,
-//               &entries[i].weather_id,
-//               entries[i].weather_main,
-//               entries[i].weather_description,
-//               entries[i].weather_icon);
     }
 
     return 0;
