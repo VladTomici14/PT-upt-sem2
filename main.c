@@ -3,7 +3,9 @@
 #include <string.h>
 #include <time.h>
 
-// Define the DataEntry struct to match the CSV columns
+// ---------------------------
+// ----- DATA STRUCTURES -----
+// ---------------------------
 typedef struct {
     long dt;               // Unix timestamp
     char dt_iso[64];       // ISO formatted date and time
@@ -35,8 +37,253 @@ typedef struct {
     char weather_icon[10]; // Weather icon code
 } DataEntry;
 
-// Function to print a single DataEntry
+typedef struct {
+    double avg_temp;
+    double avg_humidity;
+    double avg_pressure;
+    struct {
+        char type[50];
+        int count;
+    } weather_types[10];
+    int weather_type_count;
+} BasicStatistics;
+
+typedef struct {
+    DataEntry* entries;
+    int count;
+} FilteredResults;
+
+typedef struct {
+    DataEntry highest_temp;
+    DataEntry lowest_temp;
+    DataEntry strongest_wind;
+    DataEntry highest_humidity;
+} ExtremeValues;
+
+typedef struct {
+    int hour;
+    double avg_temp;
+    double temp_trend; // Positive for increasing, negative for decreasing
+} HourlyAnalysis;
+
+// --------------------------------------
+// ----- BASIC STATISTICS FUNCTIONS -----
+// --------------------------------------
+BasicStatistics calculateBasicStatistics(DataEntry* entries, int numEntries) {
+    BasicStatistics stats = {0};
+    double total_temp = 0, total_humidity = 0, total_pressure = 0;
+
+    // Initialize weather type counts
+    stats.weather_type_count = 0;
+
+    // Temporary arrays to track weather type counts
+    char weather_types[10][50] = {0};
+    int weather_counts[10] = {0};
+
+    for (int i = 0; i < numEntries; i++) {
+        // Accumulate totals
+        total_temp += entries[i].temp;
+        total_humidity += entries[i].humidity;
+        total_pressure += entries[i].pressure;
+
+        // Count weather types
+        int found = 0;
+        for (int j = 0; j < stats.weather_type_count; j++) {
+            if (strcmp(weather_types[j], entries[i].weather_main) == 0) {
+                weather_counts[j]++;
+                found = 1;
+                break;
+            }
+        }
+
+        // If not found, add new weather type
+        if (!found) {
+            strcpy(weather_types[stats.weather_type_count], entries[i].weather_main);
+            weather_counts[stats.weather_type_count] = 1;
+            stats.weather_type_count++;
+        }
+    }
+
+    // Calculate averages
+    stats.avg_temp = total_temp / numEntries;
+    stats.avg_humidity = total_humidity / numEntries;
+    stats.avg_pressure = total_pressure / numEntries;
+
+    // Copy weather type counts
+    for (int i = 0; i < stats.weather_type_count; i++) {
+        strcpy(stats.weather_types[i].type, weather_types[i]);
+        stats.weather_types[i].count = weather_counts[i];
+    }
+
+    return stats;
+}
+
+// Function to print basic statistics
+void printBasicStatistics(const BasicStatistics* stats) {
+    printf("Basic Statistics:\n");
+    printf("Average Temperature: %.2f°C\n", stats->avg_temp);
+    printf("Average Humidity: %.2f%%\n", stats->avg_humidity);
+    printf("Average Pressure: %.2f hPa\n", stats->avg_pressure);
+
+    printf("\nWeather Type Counts:\n");
+    for (int i = 0; i < stats->weather_type_count; i++) {
+        printf("%s: %d\n", stats->weather_types[i].type, stats->weather_types[i].count);
+    }
+}
+
+// -------------------------------
+// ----- FILTERING FUNCTIONS -----
+// -------------------------------
+// Find records by date range (assumes dt is in Unix timestamp)
+FilteredResults findRecordsByDateRange(DataEntry* entries, int numEntries,
+                                       long start_timestamp, long end_timestamp) {
+    FilteredResults results = {NULL, 0};
+
+    // Allocate maximum possible memory
+    results.entries = malloc(numEntries * sizeof(DataEntry));
+
+    for (int i = 0; i < numEntries; i++) {
+        if (entries[i].dt >= start_timestamp && entries[i].dt <= end_timestamp) {
+            results.entries[results.count] = entries[i];
+            results.count++;
+        }
+    }
+
+    // Resize to actual count
+    results.entries = realloc(results.entries, results.count * sizeof(DataEntry));
+
+    return results;
+}
+
+// Find records by weather type
+FilteredResults findRecordsByWeatherType(DataEntry* entries, int numEntries, const char* weather_type) {
+    FilteredResults results = {NULL, 0};
+
+    // Allocate maximum possible memory
+    results.entries = malloc(numEntries * sizeof(DataEntry));
+
+    for (int i = 0; i < numEntries; i++) {
+        if (strcasecmp(entries[i].weather_main, weather_type) == 0) {
+            results.entries[results.count] = entries[i];
+            results.count++;
+        }
+    }
+
+    // Resize to actual count
+    results.entries = realloc(results.entries, results.count * sizeof(DataEntry));
+
+    return results;
+}
+
+// ------------------------------------
+// ----- EXTREME VALUES FUNCTIONS -----
+// ------------------------------------
+ExtremeValues findExtremeValues(DataEntry* entries, int numEntries) {
+    ExtremeValues extremes;
+
+    // Initialize with first entry
+    extremes.highest_temp = entries[0];
+    extremes.lowest_temp = entries[0];
+    extremes.strongest_wind = entries[0];
+    extremes.highest_humidity = entries[0];
+
+    for (int i = 1; i < numEntries; i++) {
+        // Highest temperature
+        if (entries[i].temp > extremes.highest_temp.temp) {
+            extremes.highest_temp = entries[i];
+        }
+
+        // Lowest temperature
+        if (entries[i].temp < extremes.lowest_temp.temp) {
+            extremes.lowest_temp = entries[i];
+        }
+
+        // Strongest wind
+        if (entries[i].wind_speed > extremes.strongest_wind.wind_speed) {
+            extremes.strongest_wind = entries[i];
+        }
+
+        // Highest humidity
+        if (entries[i].humidity > extremes.highest_humidity.humidity) {
+            extremes.highest_humidity = entries[i];
+        }
+    }
+
+    return extremes;
+}
+
+// ---------------------------
+// ----- HOURLY ANALYSIS -----
+// ---------------------------
+HourlyAnalysis* calculateHourlyTemperatures(DataEntry* entries, int numEntries, int* num_hours) {
+    // Assuming entries are sorted by time
+    HourlyAnalysis* hourly_temps = malloc(24 * sizeof(HourlyAnalysis));
+    *num_hours = 0;
+
+    // Initialize hourly tracking
+    for (int i = 0; i < 24; i++) {
+        hourly_temps[i].hour = i;
+        hourly_temps[i].avg_temp = 0;
+        hourly_temps[i].temp_trend = 0;
+    }
+
+    // Temporary arrays to track counts and cumulative temperatures
+    int hour_counts[24] = {0};
+
+    // Aggregate temperatures by hour
+    for (int i = 0; i < numEntries; i++) {
+        // Extract hour from dt_iso
+        struct tm tm;
+        memset(&tm, 0, sizeof(struct tm));
+        strptime(entries[i].dt_iso, "%Y-%m-%d %H:%M:%S", &tm);
+
+        int hour = tm.tm_hour;
+        hourly_temps[hour].avg_temp += entries[i].temp;
+        hour_counts[hour]++;
+    }
+
+    // Calculate averages
+    for (int i = 0; i < 24; i++) {
+        if (hour_counts[i] > 0) {
+            hourly_temps[i].avg_temp /= hour_counts[i];
+            *num_hours += 1;
+        }
+    }
+
+    // Calculate temperature trend (simple linear regression)
+    if (*num_hours > 1) {
+        double sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0;
+
+        for (int i = 0; i < 24; i++) {
+            if (hour_counts[i] > 0) {
+                sum_x += i;
+                sum_y += hourly_temps[i].avg_temp;
+                sum_xy += i * hourly_temps[i].avg_temp;
+                sum_x2 += i * i;
+            }
+        }
+
+        // Linear regression slope
+        double slope = ((*num_hours * sum_xy) - (sum_x * sum_y)) /
+                       ((*num_hours * sum_x2) - (sum_x * sum_x));
+
+        // Assign trend to each hour
+        for (int i = 0; i < 24; i++) {
+            hourly_temps[i].temp_trend = slope;
+        }
+    }
+
+    return hourly_temps;
+}
+
+// ----------------------------------
+// ----- DATA ENTRIES FUNCTIONS -----
+// ----------------------------------
+
 void printDataEntry(const DataEntry* entry) {
+    /*
+     * Function for printing a single data entry
+     * */
     printf("Unix Timestamp: %ld\n", entry->dt);
     printf("ISO Date/Time: %s\n", entry->dt_iso);
     printf("Timezone: %d\n", entry->timezone);
@@ -120,13 +367,41 @@ int main() {
     DataEntry* entries = readCSVFile("inputData/Timisoara.csv", &numEntries);
 
     if (entries) {
-        // Print each entry
-        for (int i = 0; i < numEntries; i++) {
-            printDataEntry(&entries[i]);
+
+        // --- showing basic statistics ---
+        BasicStatistics stats = calculateBasicStatistics(entries, numEntries);
+        printBasicStatistics(&stats);
+
+        // --- extreme values example ---
+        ExtremeValues extremes = findExtremeValues(entries, numEntries);
+        printf("\nExtreme Values:\n");
+        printf("Highest Temperature: %.2f°C at %s\n",
+               extremes.highest_temp.temp, extremes.highest_temp.dt_iso);
+        printf("Lowest Temperature: %.2f°C at %s\n",
+               extremes.lowest_temp.temp, extremes.lowest_temp.dt_iso);
+        printf("Strongest Wind: %.2f m/s at %s\n",
+               extremes.strongest_wind.wind_speed, extremes.strongest_wind.dt_iso);
+
+        // --- filtering example ---
+        FilteredResults rain_records = findRecordsByWeatherType(entries, numEntries, "Rain");
+        printf("\nRain Records Count: %d\n", rain_records.count);
+
+        // --- hourly temperature analysis ---
+        int num_hours;
+        HourlyAnalysis* hourly_temps = calculateHourlyTemperatures(entries, numEntries, &num_hours);
+
+        printf("\nHourly Temperature Analysis:\n");
+        for (int i = 0; i < num_hours; i++) {
+            printf("Hour %d: Avg Temp = %.2f°C, Trend = %.4f\n",
+                   hourly_temps[i].hour,
+                   hourly_temps[i].avg_temp,
+                   hourly_temps[i].temp_trend);
         }
 
-        // Free allocated memory
+        // --- freeing memory ---
         free(entries);
+        free(rain_records.entries);
+        free(hourly_temps);
     }
 
     return 0;
