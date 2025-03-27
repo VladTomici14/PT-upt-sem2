@@ -74,7 +74,7 @@ void printDateTimeISO(DateTimeISO dt) {
            abs(dt.timezone_offset) / 3600);
 }
 
-void printDataEntry(const DataEntry* entry) {
+void printDataEntry(const DataEntry *entry) {
     if (entry == NULL) {
         printf("Error: NULL DataEntry pointer\n");
         return;
@@ -146,26 +146,35 @@ DateTimeISO parse_datetime(const char *dt_iso) {
     return dt;
 }
 
-void parseCsv(const char* filename, DataEntry *entries) {
+void parseCsv(const char *filename, DataEntry *entries) {
     // ----- opening the input file -----
     FILE *csv_file = fopen(filename, "r");
     if (!csv_file) {
         perror("Error opening the file!");
+        return;
     }
 
     // ----- going line by line -----
-    char line[1024];
+    char line[MAX_LINE_LENGTH];
     int k = 0;
 
     // ----- skipping the header -----
-    fgets(line, sizeof(line), csv_file);
+    if (fgets(line, sizeof(line), csv_file) == NULL) {
+        perror("Error reading header line");
+        fclose(csv_file);
+        return;
+    }
 
     while (fgets(line, sizeof(line), csv_file)) {
+        // Remove newline character
         line[strcspn(line, "\n")] = '\0';
+
+        // Tokenize the line
         char fields[MAX_FIELDS][MAX_FIELD_LENGTH];
 
         printf("%s", fields[0]);
 
+        // Parse the fields into the DataEntry structure
         entries[k].dt = atol(fields[0]);                       // Convert to long
         entries[k].dt_iso = parse_datetime(fields[1]);  // Convert to DateTimeISO
         entries[k].timezone = atoi(fields[2]);                 // Convert to int
@@ -197,11 +206,10 @@ void parseCsv(const char* filename, DataEntry *entries) {
 
         k++;
     }
-    fclose(csv_file);
 }
 
-int countCsvLines(const char* filename) {
-    FILE* file = fopen(filename, "r");
+int countCsvLines(const char *filename) {
+    FILE *file = fopen(filename, "r");
     if (file == NULL) {
         fprintf(stderr, "Error opening file %s\n", filename);
         return 0;
