@@ -3,9 +3,9 @@
 #include <string.h>
 #include <time.h>
 
-// ---------------------------
-// ----- DATA STRUCTURES -----
-// ---------------------------
+// -------------------------------------
+// ---------- DATA STRUCTURES ----------
+// -------------------------------------
 typedef struct {
     long dt;                       // Unix timestamp
     char dt_iso[64];               // ISO formatted date and time
@@ -179,9 +179,9 @@ FilteredResults findRecordsByWeatherType(DataEntry *entries, int numEntries, con
     return results;
 }
 
-// --------------------------
-// ----- EXTREME VALUES -----
-// --------------------------
+// -----------------------------------
+// ----- EXTREME VALUES ANALYSIS -----
+// -----------------------------------
 ExtremeValues findExtremeValues(DataEntry *entries, int numEntries) {
     ExtremeValues extremes;
 
@@ -342,14 +342,32 @@ DataEntry *readCSVFile(const char *filename, int *numEntries) {
 
         sscanf(line,
                "%ld,%63[^,],%d,%99[^,],%lf,%lf,%lf,%d,%lf,%lf,%lf,%lf,%d,%*[^,],%*[^,],%d,%lf,%d,%lf,%lf,%lf,%lf,%lf,%d,%d,%49[^,],%99[^,],%9[^\n]",
-               &entry->dt, entry->dt_iso, &entry->timezone, entry->city_name,
-               &entry->lat, &entry->lon, &entry->temp, &entry->visibility,
-               &entry->dew_point, &entry->feels_like, &entry->temp_min,
-               &entry->temp_max, &entry->pressure, &entry->humidity,
-               &entry->wind_speed, &entry->wind_deg, &entry->wind_gust,
-               &entry->rain_1h, &entry->rain_3h, &entry->snow_1h,
-               &entry->snow_3h, &entry->clouds_all, &entry->weather_id,
-               entry->weather_main, entry->weather_description, entry->weather_icon);
+               &entry->dt,
+               entry->dt_iso,
+               &entry->timezone,
+               entry->city_name,
+               &entry->lat,
+               &entry->lon,
+               &entry->temp,
+               &entry->visibility,
+               &entry->dew_point,
+               &entry->feels_like,
+               &entry->temp_min,
+               &entry->temp_max,
+               &entry->pressure,
+               &entry->humidity,
+               &entry->wind_speed,
+               &entry->wind_deg,
+               &entry->wind_gust,
+               &entry->rain_1h,
+               &entry->rain_3h,
+               &entry->snow_1h,
+               &entry->snow_3h,
+               &entry->clouds_all,
+               &entry->weather_id,
+               entry->weather_main,
+               entry->weather_description,
+               entry->weather_icon);
 
         (*numEntries)++;
     }
@@ -370,12 +388,9 @@ int main() {
         // --- extreme values example ---
         ExtremeValues extremes = findExtremeValues(entries, numEntries);
         printf("\nExtreme Values:\n");
-        printf("Highest Temperature: %.2f°C at %s\n",
-               extremes.highest_temp.temp, extremes.highest_temp.dt_iso);
-        printf("Lowest Temperature: %.2f°C at %s\n",
-               extremes.lowest_temp.temp, extremes.lowest_temp.dt_iso);
-        printf("Strongest Wind: %.2f m/s at %s\n",
-               extremes.strongest_wind.wind_speed, extremes.strongest_wind.dt_iso);
+        printf("Highest Temperature: %.2f°C at %s\n", extremes.highest_temp.temp, extremes.highest_temp.dt_iso);
+        printf("Lowest Temperature: %.2f°C at %s\n", extremes.lowest_temp.temp, extremes.lowest_temp.dt_iso);
+        printf("Strongest Wind: %.2f m/s at %s\n", extremes.strongest_wind.wind_speed, extremes.strongest_wind.dt_iso);
 
         // --- filtering example ---
         FilteredResults rain_records = findRecordsByWeatherType(entries, numEntries, "Rain");
