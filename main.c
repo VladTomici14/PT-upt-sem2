@@ -14,6 +14,9 @@
 # define MAX_FIELDS 28
 # define MAX_FIELD_LENGTH 256
 
+// ---------------------------
+// ----- Data Structures -----
+// ---------------------------
 typedef struct {
     int year;                                   // Year (e.g., 1979)
     int month;                                  // Month (1-12)
@@ -56,6 +59,9 @@ typedef struct {
     char weather_icon[10];                                     // Weather icon (e.g., 10n)
 } DataEntry;
 
+// ------------------------------
+// ----- Printing Functions -----
+// ------------------------------
 void printDateTimeISO(DateTimeISO dt) {
     printf("%04d-%02d-%02d %02d:%02d:%02d %s%02d\n",
            dt.year,
@@ -116,6 +122,9 @@ void printDataEntry(const DataEntry* entry) {
     printf("  Icon:                 %s\n", entry->weather_icon);
 }
 
+// -----------------------------
+// ----- Parsing Functions -----
+// -----------------------------
 DateTimeISO parse_datetime(const char *dt_iso) {
     DateTimeISO dt;
     sscanf(dt_iso, "%4d-%2d-%2d %2d:%2d:%2d %4d %s",
@@ -134,87 +143,28 @@ DateTimeISO parse_datetime(const char *dt_iso) {
         sscanf(dt_iso + 19, "%s", dt.timezone); // Extracts the abbreviation (UTC, GMT, etc.)
     }
 
-    return dt; // Return the parsed DateTimeISO structure
+    return dt;
 }
 
-int splitLineAdvanced(char *line, char fields[][MAX_FIELD_LENGTH], DataEntry *entries, int max_entries) {
-    int field_count = 0;
-    int start = 0;
-    int inside_quotes = 0;
-
-    for (int i = 0; line[i] != '\0' && field_count < MAX_FIELDS; i++) {
-        if (line[i] == '"') {
-            inside_quotes = !inside_quotes;
-        } else if (line[i] == ',' && !inside_quotes) {
-            int len = i - start;
-            if (len >= MAX_FIELD_LENGTH) {
-                len = MAX_FIELD_LENGTH - 1;
-            }
-
-            strncpy(fields[field_count], &line[start], len);
-
-            fields[field_count][len] = '\0';
-            field_count++;
-            start = i + 1;
-        }
-    }
-
-    if (field_count < MAX_FIELDS) {
-        int len = strlen(line) - start;
-        if (len >= MAX_FIELD_LENGTH) {
-            len = MAX_FIELD_LENGTH - 1;
-        }
-
-        strncpy(fields[field_count], &line[start], len);
-
-        fields[field_count][len] = '\0';
-        field_count++;
-    }
-
-    return field_count;
-}
-
-void process_field(char *field) {
-    int len = strlen(field);
-    if (len >= 2 && field[0] == ',' && field[len - 1] == '"') {
-        memmove(field, field + 1, len - 2);
-        field[len - 2] = '\0';
-        len -= 2;
-
-        int j = 0;
-        for (int i = 0; i < len; i++) {
-            if (field[i] == '"' && field[i + 1] == '"') {
-                field[j++] = '"';
-                i++;
-            } else {
-                field[j++] = field[i];
-            }
-        }
-        field[j] = '\0';
-    }
-}
-
-
-int main() {
-    int max_entries = 100;
-    DataEntry entries[max_entries];
-
+void parseCsv(const char* filename, DataEntry *entries) {
     // ----- opening the input file -----
-    const char *filename = "inputData/Test.csv";
     FILE *csv_file = fopen(filename, "r");
     if (!csv_file) {
         perror("Error opening the file!");
-        return 1;
     }
 
     // ----- going line by line -----
     char line[1024];
     int k = 0;
+
+    // ----- skipping the header -----
+    fgets(line, sizeof(line), csv_file);
+
     while (fgets(line, sizeof(line), csv_file)) {
         line[strcspn(line, "\n")] = '\0';
         char fields[MAX_FIELDS][MAX_FIELD_LENGTH];
 
-//        int count = splitLineAdvanced(line, fields, entries, max_entries);
+        printf("%s", fields[0]);
 
         entries[k].dt = atol(fields[0]);                       // Convert to long
         entries[k].dt_iso = parse_datetime(fields[1]);  // Convert to DateTimeISO
@@ -246,11 +196,44 @@ int main() {
         strcpy(entries[k].weather_icon, fields[27]);           // Copy string
 
         k++;
+    }
+    fclose(csv_file);
+}
 
+int countCsvLines(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file %s\n", filename);
+        return 0;
     }
 
+    int lines = 0;
+    int ch;
+    while ((ch = fgetc(file)) != EOF) {
+        if (ch == '\n') {
+            lines++;
+        }
+    }
+
+    fclose(file);
+    return lines;
+}
+
+
+int main() {
+
+    // ----- declaring the filename path -----
+    const char *filename = "inputData/test.csv";
+
+    // ----- parsing the CSV file -----
+    int total_entries = countCsvLines(filename) - 1;
+    DataEntry entries[total_entries];
+    printf("Total entries: %d\n", total_entries);
+    parseCsv(filename, entries);
+
     // ----- printing elements for testing -----
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < total_entries; i++) {
+        printf("%d ", i);
         printDataEntry(&entries[i]);
     }
 
