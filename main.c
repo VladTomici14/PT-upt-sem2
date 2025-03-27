@@ -7,34 +7,34 @@
 // ----- DATA STRUCTURES -----
 // ---------------------------
 typedef struct {
-    long dt;               // Unix timestamp
-    char dt_iso[64];       // ISO formatted date and time
-    int timezone;          // Timezone offset
-    char city_name[100];   // City name
-    double lat;            // Latitude
-    double lon;            // Longitude
-    double temp;           // Temperature
-    int visibility;        // Visibility
-    double dew_point;      // Dew point
-    double feels_like;     // Feels like temperature
-    double temp_min;       // Minimum temperature
-    double temp_max;       // Maximum temperature
-    int pressure;          // Atmospheric pressure
-    int sea_level;         // Sea level pressure (could be 0 if not provided)
-    int grnd_level;        // Ground level pressure (could be 0 if not provided)
-    int humidity;          // Humidity percentage
-    double wind_speed;     // Wind speed
-    int wind_deg;          // Wind direction (degrees)
-    double wind_gust;      // Wind gust speed
-    double rain_1h;        // Rain in the last 1 hour
-    double rain_3h;        // Rain in the last 3 hours
-    double snow_1h;        // Snow in the last 1 hour
-    double snow_3h;        // Snow in the last 3 hours
-    int clouds_all;        // Cloud cover percentage
-    int weather_id;        // Weather condition ID
-    char weather_main[50]; // Main weather condition
+    long dt;                       // Unix timestamp
+    char dt_iso[64];               // ISO formatted date and time
+    int timezone;                  // Timezone offset
+    char city_name[100];           // City name
+    double lat;                    // Latitude
+    double lon;                    // Longitude
+    double temp;                   // Temperature
+    int visibility;                // Visibility
+    double dew_point;              // Dew point
+    double feels_like;             // Feels like temperature
+    double temp_min;               // Minimum temperature
+    double temp_max;               // Maximum temperature
+    int pressure;                  // Atmospheric pressure
+    int sea_level;                 // Sea level pressure (could be 0 if not provided)
+    int grnd_level;                // Ground level pressure (could be 0 if not provided)
+    int humidity;                  // Humidity percentage
+    double wind_speed;             // Wind speed
+    int wind_deg;                  // Wind direction (degrees)
+    double wind_gust;              // Wind gust speed
+    double rain_1h;                // Rain in the last 1 hour
+    double rain_3h;                // Rain in the last 3 hours
+    double snow_1h;                // Snow in the last 1 hour
+    double snow_3h;                // Snow in the last 3 hours
+    int clouds_all;                // Cloud cover percentage
+    int weather_id;                // Weather condition ID
+    char weather_main[50];         // Main weather condition
     char weather_description[100]; // Weather description
-    char weather_icon[10]; // Weather icon code
+    char weather_icon[10];         // Weather icon code
 } DataEntry;
 
 typedef struct {
@@ -49,7 +49,7 @@ typedef struct {
 } BasicStatistics;
 
 typedef struct {
-    DataEntry* entries;
+    DataEntry *entries;
     int count;
 } FilteredResults;
 
@@ -63,13 +63,16 @@ typedef struct {
 typedef struct {
     int hour;
     double avg_temp;
-    double temp_trend; // Positive for increasing, negative for decreasing
+    double temp_trend;
 } HourlyAnalysis;
 
-// --------------------------------------
-// ----- BASIC STATISTICS FUNCTIONS -----
-// --------------------------------------
-BasicStatistics calculateBasicStatistics(DataEntry* entries, int numEntries) {
+// ----------------------------
+// ----- BASIC STATISTICS -----
+// ----------------------------
+BasicStatistics calculateBasicStatistics(DataEntry *entries, int numEntries) {
+    /*
+     * function for computing the basic statistics
+     * */
     BasicStatistics stats = {0};
     double total_temp = 0, total_humidity = 0, total_pressure = 0;
 
@@ -86,7 +89,6 @@ BasicStatistics calculateBasicStatistics(DataEntry* entries, int numEntries) {
         total_humidity += entries[i].humidity;
         total_pressure += entries[i].pressure;
 
-        // Count weather types
         int found = 0;
         for (int j = 0; j < stats.weather_type_count; j++) {
             if (strcmp(weather_types[j], entries[i].weather_main) == 0) {
@@ -104,12 +106,11 @@ BasicStatistics calculateBasicStatistics(DataEntry* entries, int numEntries) {
         }
     }
 
-    // Calculate averages
+    // --- computing averages ---
     stats.avg_temp = total_temp / numEntries;
     stats.avg_humidity = total_humidity / numEntries;
     stats.avg_pressure = total_pressure / numEntries;
 
-    // Copy weather type counts
     for (int i = 0; i < stats.weather_type_count; i++) {
         strcpy(stats.weather_types[i].type, weather_types[i]);
         stats.weather_types[i].count = weather_counts[i];
@@ -118,8 +119,10 @@ BasicStatistics calculateBasicStatistics(DataEntry* entries, int numEntries) {
     return stats;
 }
 
-// Function to print basic statistics
-void printBasicStatistics(const BasicStatistics* stats) {
+void printBasicStatistics(const BasicStatistics *stats) {
+    /*
+     * function for printing basic statistics
+     * */
     printf("Basic Statistics:\n");
     printf("Average Temperature: %.2f°C\n", stats->avg_temp);
     printf("Average Humidity: %.2f%%\n", stats->avg_humidity);
@@ -134,12 +137,13 @@ void printBasicStatistics(const BasicStatistics* stats) {
 // -------------------------------
 // ----- FILTERING FUNCTIONS -----
 // -------------------------------
-// Find records by date range (assumes dt is in Unix timestamp)
-FilteredResults findRecordsByDateRange(DataEntry* entries, int numEntries,
-                                       long start_timestamp, long end_timestamp) {
+FilteredResults findRecordsByDateRange(DataEntry *entries, int numEntries, long start_timestamp, long end_timestamp) {
+    /*
+     * function for finding records by date range
+     * */
     FilteredResults results = {NULL, 0};
 
-    // Allocate maximum possible memory
+    // --- allocating memory --
     results.entries = malloc(numEntries * sizeof(DataEntry));
 
     for (int i = 0; i < numEntries; i++) {
@@ -149,17 +153,18 @@ FilteredResults findRecordsByDateRange(DataEntry* entries, int numEntries,
         }
     }
 
-    // Resize to actual count
     results.entries = realloc(results.entries, results.count * sizeof(DataEntry));
 
     return results;
 }
 
-// Find records by weather type
-FilteredResults findRecordsByWeatherType(DataEntry* entries, int numEntries, const char* weather_type) {
+FilteredResults findRecordsByWeatherType(DataEntry *entries, int numEntries, const char *weather_type) {
+    /*
+     * function for finding records by weather type
+     * */
     FilteredResults results = {NULL, 0};
 
-    // Allocate maximum possible memory
+    // --- allocating memory ---
     results.entries = malloc(numEntries * sizeof(DataEntry));
 
     for (int i = 0; i < numEntries; i++) {
@@ -169,41 +174,40 @@ FilteredResults findRecordsByWeatherType(DataEntry* entries, int numEntries, con
         }
     }
 
-    // Resize to actual count
     results.entries = realloc(results.entries, results.count * sizeof(DataEntry));
 
     return results;
 }
 
-// ------------------------------------
-// ----- EXTREME VALUES FUNCTIONS -----
-// ------------------------------------
-ExtremeValues findExtremeValues(DataEntry* entries, int numEntries) {
+// --------------------------
+// ----- EXTREME VALUES -----
+// --------------------------
+ExtremeValues findExtremeValues(DataEntry *entries, int numEntries) {
     ExtremeValues extremes;
 
-    // Initialize with first entry
+    // --- initialising with a first entry ---
     extremes.highest_temp = entries[0];
     extremes.lowest_temp = entries[0];
     extremes.strongest_wind = entries[0];
     extremes.highest_humidity = entries[0];
 
     for (int i = 1; i < numEntries; i++) {
-        // Highest temperature
+        // --- highest temperature ---
         if (entries[i].temp > extremes.highest_temp.temp) {
             extremes.highest_temp = entries[i];
         }
 
-        // Lowest temperature
+        // --- lowest temperature ---
         if (entries[i].temp < extremes.lowest_temp.temp) {
             extremes.lowest_temp = entries[i];
         }
 
-        // Strongest wind
+        // --- strongest wind ---
         if (entries[i].wind_speed > extremes.strongest_wind.wind_speed) {
             extremes.strongest_wind = entries[i];
         }
 
-        // Highest humidity
+        // --- highest humidity ---
         if (entries[i].humidity > extremes.highest_humidity.humidity) {
             extremes.highest_humidity = entries[i];
         }
@@ -215,24 +219,19 @@ ExtremeValues findExtremeValues(DataEntry* entries, int numEntries) {
 // ---------------------------
 // ----- HOURLY ANALYSIS -----
 // ---------------------------
-HourlyAnalysis* calculateHourlyTemperatures(DataEntry* entries, int numEntries, int* num_hours) {
-    // Assuming entries are sorted by time
-    HourlyAnalysis* hourly_temps = malloc(24 * sizeof(HourlyAnalysis));
+HourlyAnalysis *calculateHourlyTemperatures(DataEntry *entries, int numEntries, int *num_hours) {
+    HourlyAnalysis *hourly_temps = malloc(24 * sizeof(HourlyAnalysis));
     *num_hours = 0;
 
-    // Initialize hourly tracking
     for (int i = 0; i < 24; i++) {
         hourly_temps[i].hour = i;
         hourly_temps[i].avg_temp = 0;
         hourly_temps[i].temp_trend = 0;
     }
 
-    // Temporary arrays to track counts and cumulative temperatures
     int hour_counts[24] = {0};
-
-    // Aggregate temperatures by hour
     for (int i = 0; i < numEntries; i++) {
-        // Extract hour from dt_iso
+        // extracting hour from the dt_iso
         struct tm tm;
         memset(&tm, 0, sizeof(struct tm));
         strptime(entries[i].dt_iso, "%Y-%m-%d %H:%M:%S", &tm);
@@ -242,7 +241,7 @@ HourlyAnalysis* calculateHourlyTemperatures(DataEntry* entries, int numEntries, 
         hour_counts[hour]++;
     }
 
-    // Calculate averages
+    // --- computing averages ---
     for (int i = 0; i < 24; i++) {
         if (hour_counts[i] > 0) {
             hourly_temps[i].avg_temp /= hour_counts[i];
@@ -250,7 +249,7 @@ HourlyAnalysis* calculateHourlyTemperatures(DataEntry* entries, int numEntries, 
         }
     }
 
-    // Calculate temperature trend (simple linear regression)
+    // --- temperature trend with simple linear regression ---
     if (*num_hours > 1) {
         double sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0;
 
@@ -263,11 +262,10 @@ HourlyAnalysis* calculateHourlyTemperatures(DataEntry* entries, int numEntries, 
             }
         }
 
-        // Linear regression slope
-        double slope = ((*num_hours * sum_xy) - (sum_x * sum_y)) /
-                       ((*num_hours * sum_x2) - (sum_x * sum_x));
+        // --- linear regression slope ---
+        double slope = ((*num_hours * sum_xy) - (sum_x * sum_y)) / ((*num_hours * sum_x2) - (sum_x * sum_x));
 
-        // Assign trend to each hour
+        // --- assigning trend to each hour ---
         for (int i = 0; i < 24; i++) {
             hourly_temps[i].temp_trend = slope;
         }
@@ -279,8 +277,7 @@ HourlyAnalysis* calculateHourlyTemperatures(DataEntry* entries, int numEntries, 
 // ----------------------------------
 // ----- DATA ENTRIES FUNCTIONS -----
 // ----------------------------------
-
-void printDataEntry(const DataEntry* entry) {
+void printDataEntry(const DataEntry *entry) {
     /*
      * Function for printing a single data entry
      * */
@@ -298,7 +295,7 @@ void printDataEntry(const DataEntry* entry) {
     printf("Humidity: %d%%\n", entry->humidity);
     printf("Wind: %.2f m/s, Direction: %d°\n", entry->wind_speed, entry->wind_deg);
 
-    // Print precipitation if available
+    // --- printing precipitation if available ---
     if (entry->rain_1h > 0)
         printf("Rain (1h): %.2f mm\n", entry->rain_1h);
     if (entry->rain_3h > 0)
@@ -314,38 +311,37 @@ void printDataEntry(const DataEntry* entry) {
     printf("\n");
 }
 
-// Function to read CSV file and parse entries
-DataEntry* readCSVFile(const char* filename, int* numEntries) {
-    FILE* file = fopen(filename, "r");
+DataEntry *readCSVFile(const char *filename, int *numEntries) {
+    /*
+     * function for parsing the CSV
+     * */
+    FILE *file = fopen(filename, "r");
     if (!file) {
         perror("Error opening file");
         return NULL;
     }
 
-    // Allocate initial memory for entries
+    // --- allocating initial memory for initial entries ---
     int capacity = 10;
-    DataEntry* entries = malloc(capacity * sizeof(DataEntry));
+    DataEntry *entries = malloc(capacity * sizeof(DataEntry));
     *numEntries = 0;
 
-    // Buffer for reading lines
     char line[1024];
-    // Skip header line
+
+    // --- skipping header line ---
     fgets(line, sizeof(line), file);
 
-    // Read each line
+    // --- reading each line ---
     while (fgets(line, sizeof(line), file)) {
-        // Resize array if needed
         if (*numEntries >= capacity) {
             capacity *= 2;
             entries = realloc(entries, capacity * sizeof(DataEntry));
         }
 
-        // Parse the line
-        DataEntry* entry = &entries[*numEntries];
+        DataEntry *entry = &entries[*numEntries];
 
-        // Use sscanf to parse CSV line
-        // Note: This is a basic parser and might need refinement for complex CSV files
-        sscanf(line, "%ld,%63[^,],%d,%99[^,],%lf,%lf,%lf,%d,%lf,%lf,%lf,%lf,%d,%*[^,],%*[^,],%d,%lf,%d,%lf,%lf,%lf,%lf,%lf,%d,%d,%49[^,],%99[^,],%9[^\n]",
+        sscanf(line,
+               "%ld,%63[^,],%d,%99[^,],%lf,%lf,%lf,%d,%lf,%lf,%lf,%lf,%d,%*[^,],%*[^,],%d,%lf,%d,%lf,%lf,%lf,%lf,%lf,%d,%d,%49[^,],%99[^,],%9[^\n]",
                &entry->dt, entry->dt_iso, &entry->timezone, entry->city_name,
                &entry->lat, &entry->lon, &entry->temp, &entry->visibility,
                &entry->dew_point, &entry->feels_like, &entry->temp_min,
@@ -364,10 +360,9 @@ DataEntry* readCSVFile(const char* filename, int* numEntries) {
 
 int main() {
     int numEntries;
-    DataEntry* entries = readCSVFile("inputData/Timisoara.csv", &numEntries);
+    DataEntry *entries = readCSVFile("inputData/Timisoara.csv", &numEntries);
 
     if (entries) {
-
         // --- showing basic statistics ---
         BasicStatistics stats = calculateBasicStatistics(entries, numEntries);
         printBasicStatistics(&stats);
@@ -388,7 +383,7 @@ int main() {
 
         // --- hourly temperature analysis ---
         int num_hours;
-        HourlyAnalysis* hourly_temps = calculateHourlyTemperatures(entries, numEntries, &num_hours);
+        HourlyAnalysis *hourly_temps = calculateHourlyTemperatures(entries, numEntries, &num_hours);
 
         printf("\nHourly Temperature Analysis:\n");
         for (int i = 0; i < num_hours; i++) {
