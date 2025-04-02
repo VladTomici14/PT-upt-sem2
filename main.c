@@ -7,7 +7,7 @@
 // ---------- DATA STRUCTURES ----------
 // -------------------------------------
 typedef struct {
-    long dt;                       // Unix timestamp
+    long dt;                        // Unix timestamp
     char dt_iso[64];               // ISO formatted date and time
     int timezone;                  // Timezone offset
     char city_name[100];           // City name
@@ -296,14 +296,18 @@ void printDataEntry(const DataEntry *entry) {
     printf("Wind: %.2f m/s, Direction: %d°\n", entry->wind_speed, entry->wind_deg);
 
     // --- printing precipitation if available ---
-    if (entry->rain_1h > 0)
+    if (entry->rain_1h > 0) {
         printf("Rain (1h): %.2f mm\n", entry->rain_1h);
-    if (entry->rain_3h > 0)
+    }
+    if (entry->rain_3h > 0) {
         printf("Rain (3h): %.2f mm\n", entry->rain_3h);
-    if (entry->snow_1h > 0)
+    }
+    if (entry->snow_1h > 0) {
         printf("Snow (1h): %.2f mm\n", entry->snow_1h);
-    if (entry->snow_3h > 0)
+    }
+    if (entry->snow_3h > 0) {
         printf("Snow (3h): %.2f mm\n", entry->snow_3h);
+    }
 
     printf("Cloud Cover: %d%%\n", entry->clouds_all);
     printf("Weather: %s (%s)\n", entry->weather_main, entry->weather_description);
@@ -376,43 +380,83 @@ DataEntry *readCSVFile(const char *filename, int *numEntries) {
     return entries;
 }
 
+
+// -------------------------
+// ----- MENU ELEMENTS -----
+// -------------------------
+void showGeneralMenu() {
+    printf("\nPICK AN OPTION:\n1) show database\n2) display basic statistics\n3) show extreem values\n4) show hourly temperature\n0) exit\n");
+}
+
 int main() {
     int numEntries;
     DataEntry *entries = readCSVFile("inputData/Timisoara.csv", &numEntries);
 
     if (entries) {
-        // --- showing basic statistics ---
-        BasicStatistics stats = calculateBasicStatistics(entries, numEntries);
-        printBasicStatistics(&stats);
+        int current_option = -1;
 
-        // --- extreme values example ---
-        ExtremeValues extremes = findExtremeValues(entries, numEntries);
-        printf("\nExtreme Values:\n");
-        printf("Highest Temperature: %.2f°C at %s\n", extremes.highest_temp.temp, extremes.highest_temp.dt_iso);
-        printf("Lowest Temperature: %.2f°C at %s\n", extremes.lowest_temp.temp, extremes.lowest_temp.dt_iso);
-        printf("Strongest Wind: %.2f m/s at %s\n", extremes.strongest_wind.wind_speed, extremes.strongest_wind.dt_iso);
+        while (current_option != 0) {
+            showGeneralMenu();
+            scanf("%d", &current_option);
 
-        // --- filtering example ---
-        FilteredResults rain_records = findRecordsByWeatherType(entries, numEntries, "Rain");
-        printf("\nRain Records Count: %d\n", rain_records.count);
+            if (current_option == 1) {
+                printf("\n[ACTION] Showing the database...\n");
 
-        // --- hourly temperature analysis ---
-        int num_hours;
-        HourlyAnalysis *hourly_temps = calculateHourlyTemperatures(entries, numEntries, &num_hours);
+                int interval_start = 0, interval_stop = 5;
+                printf("interval start: ");
+                scanf("%d", &interval_start);
+                printf("interval stop: ");
+                scanf("%d", &interval_stop);
 
-        printf("\nHourly Temperature Analysis:\n");
-        for (int i = 0; i < num_hours; i++) {
-            printf("Hour %d: Avg Temp = %.2f°C, Trend = %.4f\n",
-                   hourly_temps[i].hour,
-                   hourly_temps[i].avg_temp,
-                   hourly_temps[i].temp_trend);
+                for (int i = interval_start; i < interval_stop; i++) {
+                    printDataEntry(&entries[i]);
+                    printf("\n");
+                }
+
+            } else if (current_option == 2) {
+                // --- showing basic statistics ---
+                BasicStatistics stats = calculateBasicStatistics(entries, numEntries);
+                printBasicStatistics(&stats);
+
+            } else if (current_option == 3) {
+                // --- extreme values example ---
+                ExtremeValues extremes = findExtremeValues(entries, numEntries);
+                printf("\nExtreme Values:\n");
+                printf("Highest Temperature: %.2f°C at %s\n", extremes.highest_temp.temp, extremes.highest_temp.dt_iso);
+                printf("Lowest Temperature: %.2f°C at %s\n", extremes.lowest_temp.temp, extremes.lowest_temp.dt_iso);
+                printf("Strongest Wind: %.2f m/s at %s\n", extremes.strongest_wind.wind_speed,
+                       extremes.strongest_wind.dt_iso);
+
+            } else if (current_option == 4) {
+                // --- hourly temperature analysis ---
+                int num_hours;
+                HourlyAnalysis *hourly_temps = calculateHourlyTemperatures(entries, numEntries, &num_hours);
+
+                printf("\nHourly Temperature Analysis:\n");
+                for (int i = 0; i < num_hours; i++) {
+                    printf("Hour %d: Avg Temp = %.2f°C, Trend = %.4f\n",
+                           hourly_temps[i].hour,
+                           hourly_temps[i].avg_temp,
+                           hourly_temps[i].temp_trend);
+                }
+
+                free(hourly_temps);
+
+            } else if (current_option == 0) {
+                printf("\n[ACTION] Exiting the program...\n");
+                // --- freeing memory ---
+                free(entries);
+            }
+
         }
-
-        // --- freeing memory ---
-        free(entries);
-        free(rain_records.entries);
-        free(hourly_temps);
     }
+
+
+//    // --- filtering example ---
+//    FilteredResults rain_records = findRecordsByWeatherType(entries, numEntries, "Rain");
+//    printf("\nRain Records Count: %d\n", rain_records.count);
+//    free(rain_records.entries);
+
 
     return 0;
 }
