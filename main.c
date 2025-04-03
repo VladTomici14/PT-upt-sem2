@@ -380,12 +380,106 @@ DataEntry *readCSVFile(const char *filename, int *numEntries) {
     return entries;
 }
 
+// ------------------------------
+// ----- HISTOGRAM FUNCTIONS ----
+// ------------------------------
+void drawHorizontalHistogram(const char *title, const char *labels[], double values[], int count, int max_width) {
+    /*
+     * Function to draw a horizontal bar chart in the terminal
+     *  @param title: title of the histogram
+     *  @param labels: array of labels for each bar
+     *  @param values: array of values for each bar
+     *  @param count: number of bars
+     *  @param max_width: maximum width of the histogram
+     * */
+    printf("\n%s\n", title);
+    printf("------------------------------\n");
+
+
+    // --- finding the maximum value for scaling ---
+    double max_value = 0;
+    for (int i = 0; i < count; i++) {
+        if (values[i] > max_value) {
+            max_value = values[i];
+        }
+    }
+
+    // --- drawing each bar ---
+    for (int i = 0; i < count; i++) {
+        int bar_length = (int)((values[i] / max_value) * max_width);
+
+        // Print the label
+        printf("%-15s [%6.2f] |", labels[i], values[i]);
+
+        // Print the bar
+        for (int j = 0; j < bar_length; j++) {
+            printf("█");
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+void drawWeatherTypeHistogram(const BasicStatistics *stats) {
+    /*
+     * Function to draw weather type distribution histogram
+     *  @param stats: pointer to BasicStatistics struct
+     * */
+    const char *labels[10];
+    double values[10];
+
+    for (int i = 0; i < stats->weather_type_count; i++) {
+        labels[i] = stats->weather_types[i].type;
+        values[i] = (double)stats->weather_types[i].count;
+    }
+
+    drawHorizontalHistogram("Weather Type Distribution", labels, values, stats->weather_type_count, 50);
+}
+
+void drawExtremeValuesHistogram(const ExtremeValues *extremes) {
+    /*
+     * Function to draw extreme values comparison
+     *  @param extremes: pointer to ExtremeValues struct
+     * */
+    const char *labels[] = {"Highest Temp", "Lowest Temp", "Strongest Wind", "Highest Humidity"};
+    double values[] = {
+            extremes->highest_temp.temp,
+            extremes->lowest_temp.temp,
+            extremes->strongest_wind.wind_speed,
+            (double)extremes->highest_humidity.humidity
+    };
+
+    drawHorizontalHistogram("Extreme Values", labels, values, 4, 40);
+}
+
+void drawBasicStatsHistogram(const BasicStatistics *stats) {
+    /*
+     * Function to draw temperature, humidity, pressure comparison
+     *  @param stats: pointer to BasicStatistics struct
+     * */
+
+    const char *labels[] = {"Avg Temperature (°C)", "Avg Humidity (%)", "Avg Pressure (hPa/10)"};
+    double values[] = {
+            stats->avg_temp,
+            stats->avg_humidity,
+            stats->avg_pressure / 10  // Scaled down to fit on the same scale
+    };
+
+    drawHorizontalHistogram("Basic Weather Statistics", labels, values, 3, 40);
+}
+
 
 // -------------------------
 // ----- MENU ELEMENTS -----
 // -------------------------
 void showGeneralMenu() {
-    printf("\nPICK AN OPTION:\n1) show database\n2) display basic statistics\n3) show extreem values\n4) show hourly temperature\n0) exit\n");
+    printf("\nPICK AN OPTION:"
+           "\n1) show database"
+           "\n2) display basic statistics"
+           "\n3) show extreem values"
+           "\n4) show hourly temperature"
+           "\n5) show histograms"
+           "\n0) exit\n");
 }
 
 int main() {
@@ -442,6 +536,41 @@ int main() {
 
                 free(hourly_temps);
 
+            } else if (current_option == 5) {
+                // --- displaying histograms ---
+                printf("\n[ACTION] Showing all histograms...\n");
+
+                // Basic statistics histograms
+                BasicStatistics stats = calculateBasicStatistics(entries, numEntries);
+                drawBasicStatsHistogram(&stats);
+                drawWeatherTypeHistogram(&stats);
+
+                // Extreme values histogram
+                ExtremeValues extremes = findExtremeValues(entries, numEntries);
+                drawExtremeValuesHistogram(&extremes);
+
+                // Hourly temperature histogram
+                int num_hours;
+                HourlyAnalysis *hourly_temps = calculateHourlyTemperatures(entries, numEntries, &num_hours);
+
+                // Prepare data for hourly histogram
+                const char *labels[24];
+                double values[24];
+                char hour_labels[24][6];
+                int valid_hours = 0;
+
+                for (int i = 0; i < 24; i++) {
+                    sprintf(hour_labels[i], "%02d:00", i);
+                    if (hourly_temps[i].avg_temp != 0) {
+                        labels[valid_hours] = hour_labels[i];
+                        values[valid_hours] = hourly_temps[i].avg_temp;
+                        valid_hours++;
+                    }
+                }
+
+                drawHorizontalHistogram("Hourly Temperature Distribution", labels, values, valid_hours, 40);
+                free(hourly_temps);
+
             } else if (current_option == 0) {
                 printf("\n[ACTION] Exiting the program...\n");
                 // --- freeing memory ---
@@ -450,13 +579,6 @@ int main() {
 
         }
     }
-
-
-//    // --- filtering example ---
-//    FilteredResults rain_records = findRecordsByWeatherType(entries, numEntries, "Rain");
-//    printf("\nRain Records Count: %d\n", rain_records.count);
-//    free(rain_records.entries);
-
 
     return 0;
 }
