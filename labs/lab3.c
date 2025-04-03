@@ -540,20 +540,20 @@ int main() {
                 // --- displaying histograms ---
                 printf("\n[ACTION] Showing all histograms...\n");
 
-                // Basic statistics histograms
+                // --- basic statistics histograms ---
                 BasicStatistics stats = calculateBasicStatistics(entries, numEntries);
                 drawBasicStatsHistogram(&stats);
                 drawWeatherTypeHistogram(&stats);
 
-                // Extreme values histogram
+                // --- extreme values histogram ---
                 ExtremeValues extremes = findExtremeValues(entries, numEntries);
                 drawExtremeValuesHistogram(&extremes);
 
-                // Hourly temperature histogram
+                // --- hourly temperature histogram ---
                 int num_hours;
                 HourlyAnalysis *hourly_temps = calculateHourlyTemperatures(entries, numEntries, &num_hours);
 
-                // Prepare data for hourly histogram
+                // --- preparing data for hourly histogram ---
                 const char *labels[24];
                 double values[24];
                 char hour_labels[24][6];
