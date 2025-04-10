@@ -5,12 +5,9 @@
 #include <time.h>
 #include <stddef.h>
 
-#define BIN_FILE "weather.bin"
-
 #define MAGIC "WBIN"
-#define VERSION 1.0
 #define CITY_NAME_LEN 50
-#define DESC_LEN 30
+#define MAX_DESC_LEN 30
 
 // ---------------------------
 // ----- DATA STRUCTURES -----
@@ -55,155 +52,96 @@ typedef struct {
     char weather_icon[10];         // Weather icon code
 } DataEntry;
 
-void write_header(FILE *binFile, const char *city, float lat, float lon) {
-    if (!binFile) {
-        perror("Error: Binary file not open");
+// ----------------------------
+// ----- PARSING FUNCTION -----
+// ----------------------------
+uint64_t parseDatetime(const char *datetime_str) {
+    struct tm tm;
+    strptime(datetime_str, "%Y-%m-%d %H:%M:%S", &tm);
+    return (uint64_t) mktime(&tm);
+}
+
+// ---------------------------------
+// ----- BINARY FILE FUNCTIONS -----
+// ---------------------------------
+void convertCsv2Binary(const char *csv_path, const char *bin_path) {
+    FILE *CSV = fopen(csv_path, "r");
+    FILE *BIN = fopen(bin_path, "wb");
+
+    if (!CSV || !BIN) {
+        perror("Error opening file");
         return;
     }
 
-    FileHeader header;
-    strcpy(header.magic, MAGIC);  // Use correct magic string "WBIN"
-    header.version = VERSION;
-    header.timestamp = time(NULL);
-    header.record_count = 0;  // Initial count (will be updated later)
-    strncpy(header.city, city, CITY_NAME_LEN);
-    header.lat = lat;
-    header.lon = lon;
+    FileHeader header = {
+            .magic = MAGIC,
+            .version = 1,
+            .timestamp = (uint64_t) time(NULL),
+            .record_count = 0,
+            .lat = 45.7558f,
+            .lon = 21.2322f
+    };
+    strcpy(header.city, "Timisoara");
 
-    size_t written = fwrite(&header, sizeof(FileHeader), 1, binFile);
-    if (written != 1) {
-        perror("Error: Failed to write header");
-    }
-
-    fflush(binFile);  // Ensure data is flushed to the file
-}
-
-void appendRecord(FILE *binFile, DataEntry *entry) {
-    fseek(binFile, 0, SEEK_END); // Move to end
-    fwrite(entry, sizeof(DataEntry), 1, binFile);
-}
-
-void updateRecordCount(FILE *binFile, int count) {
-    fseek(binFile, offsetof(FileHeader, record_count), SEEK_SET);
-    fwrite(&count, sizeof(int32_t), 1, binFile);
-}
-
-DataEntry *readCSVFile(const char *filename, int *numEntries) {
-    /*
-     * function for parsing the CSV
-     * */
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        perror("Error opening file");
-        return NULL;
-    }
-
-    // --- allocating initial memory for initial entries ---
-    int capacity = 10;
-    DataEntry *entries = malloc(capacity * sizeof(DataEntry));
-    *numEntries = 0;
+    fwrite(&header, sizeof(FileHeader), 1, BIN);
 
     char line[1024];
-
-    // --- skipping header line ---
-    fgets(line, sizeof(line), file);
-
-    // --- reading each line ---
-    while (fgets(line, sizeof(line), file)) {
-        if (*numEntries >= capacity) {
-            capacity *= 2;
-            entries = realloc(entries, capacity * sizeof(DataEntry));
-        }
-
-        DataEntry *entry = &entries[*numEntries];
+    fgets(line, sizeof(line), CSV); // Skip header line
+    while (fgets(line, sizeof(line), CSV)) {
+        DataEntry entry;
 
         sscanf(line,
                "%ld,%63[^,],%d,%99[^,],%lf,%lf,%lf,%d,%lf,%lf,%lf,%lf,%d,%*[^,],%*[^,],%d,%lf,%d,%lf,%lf,%lf,%lf,%lf,%d,%d,%49[^,],%99[^,],%9[^\n]",
-               &entry->dt,
-               entry->dt_iso,
-               &entry->timezone,
-               entry->city_name,
-               &entry->lat,
-               &entry->lon,
-               &entry->temp,
-               &entry->visibility,
-               &entry->dew_point,
-               &entry->feels_like,
-               &entry->temp_min,
-               &entry->temp_max,
-               &entry->pressure,
-               &entry->humidity,
-               &entry->wind_speed,
-               &entry->wind_deg,
-               &entry->wind_gust,
-               &entry->rain_1h,
-               &entry->rain_3h,
-               &entry->snow_1h,
-               &entry->snow_3h,
-               &entry->clouds_all,
-               &entry->weather_id,
-               entry->weather_main,
-               entry->weather_description,
-               entry->weather_icon);
+               &entry.dt,
+               &entry.dt_iso,
+               &entry.timezone,
+               &entry.city_name,
+               &entry.lat,
+               &entry.lon,
+               &entry.temp,
+               &entry.visibility,
+               &entry.dew_point,
+               &entry.feels_like,
+               &entry.temp_min,
+               &entry.temp_max,
+               &entry.pressure,
+               &entry.humidity,
+               &entry.wind_speed,
+               &entry.wind_deg,
+               &entry.wind_gust,
+               &entry.rain_1h,
+               &entry.rain_3h,
+               &entry.snow_1h,
+               &entry.snow_3h,
+               &entry.clouds_all,
+               &entry.weather_id,
+               &entry.weather_main,
+               &entry.weather_description,
+               &entry.weather_icon);
 
-        (*numEntries)++;
+        fwrite(&entry, sizeof(DataEntry) - MAX_DESC_LEN, 1, BIN);
+
+        header.record_count++;
     }
 
-    fclose(file);
-    return entries;
+    fseek(BIN, 0, SEEK_SET); // Move to the beginning of the file
+    fwrite(&header, sizeof(FileHeader), 1, BIN); // Write the header again with updated record count
+
+    fclose(CSV);
+    fclose(BIN);
+
+    printf("Conversion complete. %d records written.\n", header.record_count);
+
 }
 
-void writeBinaryFile(char *binaryFilename, DataEntry *entries, int numEntries) {
-    FILE *binFile = fopen("weather.bin", "wb");
-    printf("\n[ACTION] Writing the binary file...\n");
+void readFromBinary(const char *bin_path) {
+    FILE *binFile = fopen(bin_path, "rb");
     if (!binFile) {
         perror("Error opening binary file");
         return;
     }
 
-    // Write file header
-    printf("writing the header...");
-
-    write_header(binFile, entries[0].city_name, entries[0].lat, entries[0].lon);
-
-//
-//    fwrite(&header, sizeof(FileHeader), 1, binFile);
-
-    // Write weather records
-    for (int i = 0; i < numEntries; i++) {
-//
-//        // Copy data from DataEntry to WeatherRecord
-//        record.dt = entries[i].dt;
-//        record.timezone = entries[i].timezone;
-//        strncpy(record.city_name, entries[i].city_name, CITY_NAME_LEN);
-//        record.lat = entries[i].lat;
-//        record.lon = entries[i].lon;
-//        record.temp = (int16_t) (entries[i].temp * 10); // Convert to int16 (store with 1 decimal place)
-//        record.humidity = entries[i].humidity;
-//        record.pressure = entries[i].pressure;
-//        record.wind_speed = (int16_t) (entries[i].wind_speed * 10); // Convert to int16
-//        record.wind_deg = entries[i].wind_deg;
-//        record.clouds_all = entries[i].clouds_all;
-//        record.weather_id = entries[i].weather_id;
-//        strncpy(record.weather_main, entries[i].weather_main, DESC_LEN);
-//        strncpy(record.weather_description, entries[i].weather_description, DESC_LEN);
-//        strncpy(record.weather_icon, entries[i].weather_icon, ICON_LEN);
-
-        fwrite(&entries[i], sizeof(DataEntry), 1, binFile);
-    }
-
-    fclose(binFile);
-    printf("Binary file written successfully!\n");
-}
-
-void readBinaryFile() {
-    FILE *binFile = fopen(BIN_FILE, "rb");
-    if (!binFile) {
-        perror("Error opening binary file");
-        return;
-    }
-
-    // Read and display file header
+    // ----- reading and displaying the file header -----
     FileHeader header;
     fread(&header, sizeof(FileHeader), 1, binFile);
 
@@ -212,57 +150,147 @@ void readBinaryFile() {
            header.magic, header.version, ctime(&header.timestamp),
            header.record_count, header.city, header.lat, header.lon);
 
-    // Read records
-    DataEntry entry;
-    printf("\nWeather Records:\n");
+    // ----- reading entries -----
+    DataEntry *entries = malloc(header.record_count * sizeof(DataEntry));
+    printf("\nWeather Records number: %d\n", header.record_count);
     for (int i = 0; i < header.record_count; i++) {
-        fread(&entry, sizeof(DataEntry), 1, binFile);
-//        printf("Timestamp: %ld, Temp: %.1f°C, Pressure: %d hPa, Humidity: %d%%, Desc: %s\n",
-//               entry.timestamp, record.temp / 10.0, record.pressure, record.humidity, record.description);
+        fread(&entries[i], sizeof(DataEntry), 1, binFile);
     }
 
     fclose(binFile);
 }
 
+// -------------------------------
+// ----- OPERATIONS FUNCTION -----
+// -------------------------------
+void searchByDateRange(const char *bin_path, time_t start_date, time_t end_date) {
+    FILE *binFile = fopen(bin_path, "rb");
+    if (!binFile) {
+        perror("Error opening binary file");
+        return;
+    }
+
+    FileHeader header;
+    fread(&header, sizeof(FileHeader), 1, binFile);
+
+    printf("Searching for records between %s", ctime(&start_date));
+    printf("and %s\n", ctime(&end_date));
+
+    int found_count = 0;
+    DataEntry entry;
+
+    for (int i = 0; i < header.record_count; i++) {
+        fread(&entry, sizeof(DataEntry), 1, binFile);
+
+        if (entry.dt >= start_date && entry.dt <= end_date) {
+            found_count++;
+            printf("Record #%d - Date: %s, Temp: %.1f°C, Weather: %s\n",
+                   i+1, entry.dt_iso, entry.temp, entry.weather_main);
+        }
+    }
+
+    printf("\nTotal records found: %d\n", found_count);
+    fclose(binFile);
+}
+
+int verifyFileIntegrity(const char *bin_path) {
+    FILE *binFile = fopen(bin_path, "rb");
+    if (!binFile) {
+        perror("Error opening binary file");
+        return 0;
+    }
+
+    FileHeader header;
+    size_t readResult = fread(&header, sizeof(FileHeader), 1, binFile);
+    if (readResult != 1) {
+        printf("Error reading header\n");
+        fclose(binFile);
+        return 0;
+    }
+
+    // ----- checking the magic number -----
+    if (strncmp(header.magic, MAGIC, 4) != 0) {
+        printf("Invalid file format - magic number mismatch\n");
+        fclose(binFile);
+        return 0;
+    }
+
+    // ----- verify record count -----
+    fseek(binFile, 0, SEEK_END);
+    long fileSize = ftell(binFile);
+    long expectedSize = sizeof(FileHeader) + header.record_count * sizeof(DataEntry);
+    if (fileSize != expectedSize) {
+        printf("File size mismatch. Expected: %ld, Actual: %ld\n", expectedSize, fileSize);
+        fclose(binFile);
+        return 0;
+    }
+
+    printf("File integrity verified. Format: %s, Version: %.1f, Records: %d\n",
+           header.magic, header.version, header.record_count);
+
+    fclose(binFile);
+    return 1;
+}
 
 int main() {
 
-    int numEntries;
-    DataEntry *entries = readCSVFile("inputData/test.csv", &numEntries);
+    int current_choice = -1;
 
-    if (entries) {
-        int current_choice = -1;
+    char csv_path[128], bin_path[128];
+    while (current_choice != 0) {
+        printf("\n[MENU]\n");
+        printf("1. Convert CSV to Binary\n");
+        printf("2. Read Binary File\n");
+        printf("3. Search by Date Range\n");
+        printf("4. Verify file integrity\n");
+        printf("0. Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &current_choice);
 
-        while (current_choice != 0) {
-            printf("\n1. Convert CSV to Binary\n2. Read Records\n0. Exit\n");
-            scanf("%d", &current_choice);
+        if (current_choice == 1) {
+            // ----- converting CSV to binary -----
+            printf("Enter CSV file path: ");
+            scanf("%s", csv_path);
 
-            if (current_choice == 1) {
-                // --- converting csv to binary ---
-                printf("\n[ACTION] Converting the CSV file...\n");
+            printf("Enter Binary file path: ");
+            scanf("%s", bin_path);
 
-                writeBinaryFile("weather.bin", entries, numEntries);
-                free(entries);
+            convertCsv2Binary(csv_path, bin_path);
+        } else if (current_choice == 2) {
+            // ----- reading binary file -----
+            printf("Enter Binary file path: ");
+            scanf("%s", bin_path);
 
+            readFromBinary(bin_path);
+        } else if (current_choice == 3) {
+            // ----- searching by date range -----
+            printf("Enter Binary file path: ");
+            scanf("%s", bin_path);
 
-            } else if (current_choice == 2) {
-                // --- reading records ---
-                readBinaryFile();
+            char start_date_str[20], end_date_str[20];
+            printf("Enter start date (YYYY-MM-DD HH:MM:SS): ");
+            scanf(" %19[^\n]", start_date_str);
+            printf("Enter end date (YYYY-MM-DD HH:MM:SS): ");
+            scanf(" %19[^\n]", end_date_str);
 
-            } else if (current_choice == 0) {
-                // --- exiting ---
+            time_t start_date = (time_t)parseDatetime(start_date_str);
+            time_t end_date = (time_t)parseDatetime(end_date_str);
 
-                break;
-            } else {
-                printf("\n[ACTION] Exiting the program...\n");
-            }
+            searchByDateRange(bin_path, start_date, end_date);
 
+        } else if (current_choice == 4) {
+            // ----- verifying file integrity -----
+            printf("Enter Binary file path: ");
+            scanf("%s", bin_path);
 
+            verifyFileIntegrity(bin_path);
+        } else if (current_choice == 0) {
+            printf("Exiting...\n");
+            break;
+        } else {
+            printf("Invalid choice. Please try again.\n");
+            continue;
         }
-
-
-    } else {
-        printf("Error: Could not read CSV file.\n");
     }
 
     return 0;
