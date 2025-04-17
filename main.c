@@ -1,296 +1,372 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
-#include <time.h>
-#include <stddef.h>
 
-#define MAGIC "WBIN"
-#define CITY_NAME_LEN 50
-#define MAX_DESC_LEN 30
+#define MAX_LINE_SIZE 1024
+#define MAX_RECORDS 1000
+#define MAX_FIELDS 32
+#define MAX_FIELD_SIZE 256
 
-// ---------------------------
-// ----- DATA STRUCTURES -----
-// ---------------------------
+// ----- structure for storing a single record from the csv -----
 typedef struct {
-    char magic[4];            // "WBIN"
-    float version;            // Version number
-    time_t timestamp;         // File creation time
-    int32_t record_count;     // Number of records
-    char city[CITY_NAME_LEN]; // City Name
-    float lat, lon;           // Geographical coordinates
-} FileHeader;
+    char fields[MAX_FIELDS][MAX_FIELD_SIZE];
+    int field_count;
+} Record;
 
-typedef struct {
-    long dt;                        // Unix timestamp
-    char dt_iso[64];               // ISO formatted date and time
-    int timezone;                  // Timezone offset
-    char city_name[100];           // City name
-    double lat;                    // Latitude
-    double lon;                    // Longitude
-    double temp;                   // Temperature
-    int visibility;                // Visibility
-    double dew_point;              // Dew point
-    double feels_like;             // Feels like temperature
-    double temp_min;               // Minimum temperature
-    double temp_max;               // Maximum temperature
-    int pressure;                  // Atmospheric pressure
-    int sea_level;                 // Sea level pressure (could be 0 if not provided)
-    int grnd_level;                // Ground level pressure (could be 0 if not provided)
-    int humidity;                  // Humidity percentage
-    double wind_speed;             // Wind speed
-    int wind_deg;                  // Wind direction (degrees)
-    double wind_gust;              // Wind gust speed
-    double rain_1h;                // Rain in the last 1 hour
-    double rain_3h;                // Rain in the last 3 hours
-    double snow_1h;                // Snow in the last 1 hour
-    double snow_3h;                // Snow in the last 3 hours
-    int clouds_all;                // Cloud cover percentage
-    int weather_id;                // Weather condition ID
-    char weather_main[50];         // Main weather condition
-    char weather_description[100]; // Weather description
-    char weather_icon[10];         // Weather icon code
-} DataEntry;
+typedef int (*CompareFunc)(const void *, const void *);
 
-// ----------------------------
-// ----- PARSING FUNCTION -----
-// ----------------------------
-uint64_t parseDatetime(const char *datetime_str) {
-    struct tm tm;
-    strptime(datetime_str, "%Y-%m-%d %H:%M:%S", &tm);
-    return (uint64_t) mktime(&tm);
-}
+void my_qsort(void *base, int left, int right, size_t size, CompareFunc cmp) {
+    if (left >= right) return;
 
-// ---------------------------------
-// ----- BINARY FILE FUNCTIONS -----
-// ---------------------------------
-void convertCsv2Binary(const char *csv_path, const char *bin_path) {
-    FILE *CSV = fopen(csv_path, "r");
-    FILE *BIN = fopen(bin_path, "wb");
+    char *arr = (char *)base;
+    int i = left;
+    int j = right;
+    void *pivot = malloc(size);
+    memcpy(pivot, arr + (left + (right - left) / 2) * size, size);
 
-    if (!CSV || !BIN) {
-        perror("Error opening file");
-        return;
-    }
+    while (i <= j) {
+        while (cmp(arr + i * size, pivot) < 0) i++;
+        while (cmp(arr + j * size, pivot) > 0) j--;
 
-    FileHeader header = {
-            .magic = MAGIC,
-            .version = 1,
-            .timestamp = (uint64_t) time(NULL),
-            .record_count = 0,
-            .lat = 45.7558f,
-            .lon = 21.2322f
-    };
-    strcpy(header.city, "Timisoara");
-
-    fwrite(&header, sizeof(FileHeader), 1, BIN);
-
-    char line[1024];
-    fgets(line, sizeof(line), CSV); // Skip header line
-    while (fgets(line, sizeof(line), CSV)) {
-        DataEntry entry;
-
-        sscanf(line,
-               "%ld,%63[^,],%d,%99[^,],%lf,%lf,%lf,%d,%lf,%lf,%lf,%lf,%d,%*[^,],%*[^,],%d,%lf,%d,%lf,%lf,%lf,%lf,%lf,%d,%d,%49[^,],%99[^,],%9[^\n]",
-               &entry.dt,
-               &entry.dt_iso,
-               &entry.timezone,
-               &entry.city_name,
-               &entry.lat,
-               &entry.lon,
-               &entry.temp,
-               &entry.visibility,
-               &entry.dew_point,
-               &entry.feels_like,
-               &entry.temp_min,
-               &entry.temp_max,
-               &entry.pressure,
-               &entry.humidity,
-               &entry.wind_speed,
-               &entry.wind_deg,
-               &entry.wind_gust,
-               &entry.rain_1h,
-               &entry.rain_3h,
-               &entry.snow_1h,
-               &entry.snow_3h,
-               &entry.clouds_all,
-               &entry.weather_id,
-               &entry.weather_main,
-               &entry.weather_description,
-               &entry.weather_icon);
-
-        fwrite(&entry, sizeof(DataEntry) - MAX_DESC_LEN, 1, BIN);
-
-        header.record_count++;
-    }
-
-    fseek(BIN, 0, SEEK_SET); // Move to the beginning of the file
-    fwrite(&header, sizeof(FileHeader), 1, BIN); // Write the header again with updated record count
-
-    fclose(CSV);
-    fclose(BIN);
-
-    printf("Conversion complete. %d records written.\n", header.record_count);
-
-}
-
-void readFromBinary(const char *bin_path) {
-    FILE *binFile = fopen(bin_path, "rb");
-    if (!binFile) {
-        perror("Error opening binary file");
-        return;
-    }
-
-    // ----- reading and displaying the file header -----
-    FileHeader header;
-    fread(&header, sizeof(FileHeader), 1, binFile);
-
-    printf("File Header:\n");
-    printf("Magic: %s\nVersion: %.1f\nCreated: %sRecords: %d\nCity: %s (%.2f, %.2f)\n",
-           header.magic, header.version, ctime(&header.timestamp),
-           header.record_count, header.city, header.lat, header.lon);
-
-    // ----- reading entries -----
-    DataEntry *entries = malloc(header.record_count * sizeof(DataEntry));
-    printf("\nWeather Records number: %d\n", header.record_count);
-    for (int i = 0; i < header.record_count; i++) {
-        fread(&entries[i], sizeof(DataEntry), 1, binFile);
-    }
-
-    fclose(binFile);
-}
-
-// -------------------------------
-// ----- OPERATIONS FUNCTION -----
-// -------------------------------
-void searchByDateRange(const char *bin_path, time_t start_date, time_t end_date) {
-    FILE *binFile = fopen(bin_path, "rb");
-    if (!binFile) {
-        perror("Error opening binary file");
-        return;
-    }
-
-    FileHeader header;
-    fread(&header, sizeof(FileHeader), 1, binFile);
-
-    printf("Searching for records between %s", ctime(&start_date));
-    printf("and %s\n", ctime(&end_date));
-
-    int found_count = 0;
-    DataEntry entry;
-
-    for (int i = 0; i < header.record_count; i++) {
-        fread(&entry, sizeof(DataEntry), 1, binFile);
-
-        if (entry.dt >= start_date && entry.dt <= end_date) {
-            found_count++;
-            printf("Record #%d - Date: %s, Temp: %.1f°C, Weather: %s\n",
-                   i+1, entry.dt_iso, entry.temp, entry.weather_main);
+        if (i <= j) {
+            void *temp = malloc(size);
+            memcpy(temp, arr + i * size, size);
+            memcpy(arr + i * size, arr + j * size, size);
+            memcpy(arr + j * size, temp, size);
+            free(temp);
+            i++;
+            j--;
         }
     }
 
-    printf("\nTotal records found: %d\n", found_count);
-    fclose(binFile);
+    free(pivot);
+    my_qsort(base, left, j, size, cmp);
+    my_qsort(base, i, right, size, cmp);
 }
 
-int verifyFileIntegrity(const char *bin_path) {
-    FILE *binFile = fopen(bin_path, "rb");
-    if (!binFile) {
-        perror("Error opening binary file");
-        return 0;
+// ----- function to parse a line from the csv into record structure -----
+void parse_csv_line(char *line, Record *record) {
+    int field_index = 0;
+    int char_index = 0;
+    int in_quotes = 0;
+
+    record->field_count = 0;
+
+    for (int i = 0; line[i] != '\0' && line[i] != '\n' && line[i] != '\r'; i++) {
+        if (line[i] == '"') {
+            in_quotes = !in_quotes;
+        } else if (line[i] == ',' && !in_quotes) {
+            record->fields[field_index][char_index] = '\0';
+            field_index++;
+            char_index = 0;
+            if (field_index >= MAX_FIELDS) break;
+        } else {
+            record->fields[field_index][char_index] = line[i];
+            char_index++;
+            if (char_index >= MAX_FIELD_SIZE - 1) char_index = MAX_FIELD_SIZE - 2;
+        }
     }
 
-    FileHeader header;
-    size_t readResult = fread(&header, sizeof(FileHeader), 1, binFile);
-    if (readResult != 1) {
-        printf("Error reading header\n");
-        fclose(binFile);
-        return 0;
+    // Add the last field
+    record->fields[field_index][char_index] = '\0';
+    record->field_count = field_index + 1;
+}
+
+// Custom comparison function for sorting by multiple fields
+int compare_records(const void *a, const void *b, int *sort_fields, int sort_count) {
+    const Record *record_a = (const Record *) a;
+    const Record *record_b = (const Record *) b;
+
+    // Compare each sort field in order
+    for (int i = 0; i < sort_count; i++) {
+        int field_index = sort_fields[i];
+
+        // Check if the field index is valid for both records
+        if (field_index >= record_a->field_count || field_index >= record_b->field_count) {
+            continue;
+        }
+
+        // Try numeric comparison first
+        char *end_a, *end_b;
+        double num_a = strtod(record_a->fields[field_index], &end_a);
+        double num_b = strtod(record_b->fields[field_index], &end_b);
+
+        // If both fields are valid numbers
+        if (*end_a == '\0' && *end_b == '\0') {
+            if (num_a < num_b) return -1;
+            if (num_a > num_b) return 1;
+        } else {
+            // String comparison
+            int cmp = strcmp(record_a->fields[field_index], record_b->fields[field_index]);
+            if (cmp != 0) return cmp;
+        }
     }
 
-    // ----- checking the magic number -----
-    if (strncmp(header.magic, MAGIC, 4) != 0) {
-        printf("Invalid file format - magic number mismatch\n");
-        fclose(binFile);
-        return 0;
+    // If all fields are equal
+    return 0;
+}
+
+// Wrapper function for qsort
+int compare_wrapper(const void *a, const void *b) {
+    // These should match the names in sort_records
+    static int sort_fields_static[MAX_FIELDS];
+    static int sort_count_static;
+
+    return compare_records(a, b, sort_fields_static, sort_count_static);
+}
+
+// Function to set sort parameters and call qsort
+void sort_records(Record records, int record_count, int *sort_fields, int sort_count) {
+    // Set static variables for the compare_wrapper
+    extern int compare_wrapper(const void *, const void *);
+
+    // The static variables in compare_wrapper need to be updated
+    static int sort_fields_static[MAX_FIELDS];
+    static int sort_count_static;
+
+    // Copy the sort fields and count to static variables
+    for (int i = 0; i < sort_count; i++) {
+        sort_fields_static[i] = sort_fields[i];
     }
+    sort_count_static = sort_count;
 
-    // ----- verify record count -----
-    fseek(binFile, 0, SEEK_END);
-    long fileSize = ftell(binFile);
-    long expectedSize = sizeof(FileHeader) + header.record_count * sizeof(DataEntry);
-    if (fileSize != expectedSize) {
-        printf("File size mismatch. Expected: %ld, Actual: %ld\n", expectedSize, fileSize);
-        fclose(binFile);
-        return 0;
+    // Call qsort with our wrapper function
+    my_qsort(&records, 0, record_count - 1, sizeof(Record), compare_wrapper);
+}
+
+void displayRecords(Record *records, Record header, int record_count) {
+    printf("\nData Records (%d total):\n", record_count);
+
+    // ----- displaying the header -----
+    for (int j = 0; j < header.field_count; j++) {
+        if (j == 0) {
+            printf("%-3s", header.fields[j]);
+        } else if (j == 1) {
+            printf("%-40s", header.fields[j]);
+        } else {
+            printf("%-25s", header.fields[j]);
+        }
     }
+    printf("\n");
 
-    printf("File integrity verified. Format: %s, Version: %.1f, Records: %d\n",
-           header.magic, header.version, header.record_count);
+    for (int j = 0; j < header.field_count; j++) {
+        if (j == 0) {
+            for (int k = 0; k < 3; k++) {
+                printf("-");
+            }
 
-    fclose(binFile);
-    return 1;
+        } else if (j == 1) {
+            for (int k = 0; k < 40; k++) {
+                printf("-");
+            }
+        } else {
+            for (int k = 0; k < 25; k++) {
+                printf("-");
+            }
+        }
+    }
+    printf("\n");
+
+    // ----- displaying the records with some formatting -----
+    for (int i = 0; i < record_count; i++) {
+        for (int j = 0; j < records[i].field_count; j++) {
+            if (j == 0) {
+                printf("%-3s", records[i].fields[j]);
+            } else if (j == 1) {
+                printf("%-40s", records[i].fields[j]);
+            } else {
+                printf("%-25s", records[i].fields[j]);
+            }
+        }
+        printf("\n");
+    }
 }
 
 int main() {
+    Record records[MAX_RECORDS];
+    Record header;
+    char filename[256];
+    int record_count = 0;
+    int choice = 0;
+    int sort_fields[MAX_FIELDS];
+    int sort_count = 0;
+    int has_loaded_file = 0;
+    FILE *file = NULL;
 
-    int current_choice = -1;
-
-    char csv_path[128], bin_path[128];
-    while (current_choice != 0) {
-        printf("\n[MENU]\n");
-        printf("1. Convert CSV to Binary\n");
-        printf("2. Read Binary File\n");
-        printf("3. Search by Date Range\n");
-        printf("4. Verify file integrity\n");
+    while (1) {
+        printf("\n----- CSV Sorting Program -----\n");
+        printf("1. Load CSV file\n");
+        printf("2. Display data\n");
+        printf("3. Sort data\n");
+        printf("4. Save sorted data\n");
         printf("0. Exit\n");
-        printf("Enter your choice: ");
-        scanf("%d", &current_choice);
+        printf("\nEnter your choice: ");
 
-        if (current_choice == 1) {
-            // ----- converting CSV to binary -----
-            printf("Enter CSV file path: ");
-            scanf("%s", csv_path);
-
-            printf("Enter Binary file path: ");
-            scanf("%s", bin_path);
-
-            convertCsv2Binary(csv_path, bin_path);
-        } else if (current_choice == 2) {
-            // ----- reading binary file -----
-            printf("Enter Binary file path: ");
-            scanf("%s", bin_path);
-
-            readFromBinary(bin_path);
-        } else if (current_choice == 3) {
-            // ----- searching by date range -----
-            printf("Enter Binary file path: ");
-            scanf("%s", bin_path);
-
-            char start_date_str[20], end_date_str[20];
-            printf("Enter start date (YYYY-MM-DD HH:MM:SS): ");
-            scanf(" %19[^\n]", start_date_str);
-            printf("Enter end date (YYYY-MM-DD HH:MM:SS): ");
-            scanf(" %19[^\n]", end_date_str);
-
-            time_t start_date = (time_t)parseDatetime(start_date_str);
-            time_t end_date = (time_t)parseDatetime(end_date_str);
-
-            searchByDateRange(bin_path, start_date, end_date);
-
-        } else if (current_choice == 4) {
-            // ----- verifying file integrity -----
-            printf("Enter Binary file path: ");
-            scanf("%s", bin_path);
-
-            verifyFileIntegrity(bin_path);
-        } else if (current_choice == 0) {
-            printf("Exiting...\n");
-            break;
-        } else {
-            printf("Invalid choice. Please try again.\n");
+        if (scanf("%d", &choice) != 1) {
+            // Clear input buffer
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF);
+            printf("Invalid input.\n");
             continue;
         }
+
+        // Clear input buffer
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF);
+
+        if (choice == 1) {
+            // --------------------------------
+            // ----- loading the csv file -----
+            // --------------------------------
+            printf("Input csv path: ");
+            if (scanf("%s", filename) != 1) {
+                printf("Error reading filename\n");
+                continue;
+            }
+
+            file = fopen(filename, "r");
+            if (!file) {
+                perror("Error opening file");
+            }
+
+            // Reset record count
+            record_count = 0;
+            char line[MAX_LINE_SIZE];
+
+            // Read header
+            if (fgets(line, MAX_LINE_SIZE, file)) {
+                parse_csv_line(line, &header);
+                printf("\nHeader: ");
+                for (int i = 0; i < header.field_count; i++) {
+                    printf("%s%s", header.fields[i], i < header.field_count - 1 ? ", " : "\n");
+                }
+            }
+
+            // Read data records
+            while (fgets(line, MAX_LINE_SIZE, file) && record_count < MAX_RECORDS) {
+                parse_csv_line(line, &records[record_count]);
+                record_count++;
+            }
+
+            fclose(file);
+            has_loaded_file = 1;
+
+            printf("Read %d records from CSV file\n", record_count);
+
+        } else if (choice == 2) {
+            // -------------------------------
+            // ----- displaying the data -----
+            // -------------------------------
+
+            if (!has_loaded_file) {
+                printf("No file loaded yet! Please load a file first.\n");
+                continue;
+            }
+
+            displayRecords(records, header, record_count);
+
+        } else if (choice == 3) {
+            // ----------------------------
+            // ----- sorting the data -----
+            // ----------------------------
+
+            if (!has_loaded_file) {
+                printf("No file loaded yet! Please load a file first.\n");
+                continue;
+            }
+
+            printf("Available fields:\n");
+            for (int i = 0; i < header.field_count; i++) {
+                printf("%d: %s\n", i + 1, header.fields[i]);
+            }
+
+            printf("\nHow many fields would you like to sort by? ");
+            if (scanf("%d", &sort_count) != 1 || sort_count <= 0 || sort_count > MAX_FIELDS) {
+                printf("Invalid number of sort fields\n");
+                // Clear input buffer
+                while ((c = getchar()) != '\n' && c != EOF);
+                break;
+            }
+
+            // Clear input buffer
+            while ((c = getchar()) != '\n' && c != EOF);
+
+            printf("Enter field numbers to sort by in order of priority:\n");
+            for (int i = 0; i < sort_count; i++) {  // Start from 0, not 1
+                printf("Sort field %d: ", i + 1);
+                if (scanf("%d", &sort_fields[i]) != 1 || sort_fields[i] <= 0 || sort_fields[i] > header.field_count) {  // Use header.field_count
+                    printf("Invalid field number\n");
+                    i--; // Retry this input
+                    // Clear input buffer
+                    while ((c = getchar()) != '\n' && c != EOF);
+                    continue;
+                }
+                sort_fields[i]--; // Convert to 0-based index
+            }
+
+            // Clear input buffer
+            while ((c = getchar()) != '\n' && c != EOF);
+
+            // Sort the records
+            sort_records(*records, record_count, sort_fields, sort_count);
+
+            printf("\nData sorted successfully!\n");
+            displayRecords(records, header, record_count);
+            continue;
+
+        } else if (choice == 4) {
+            // ----------------------------------
+            // ----- saving the sorted data -----
+            // ----------------------------------
+            if (!has_loaded_file) {
+                printf("No file loaded yet! Please load a file first.\n");
+                continue;
+            }
+
+            printf("Enter filename to save sorted data: ");
+            char save_filename[256];
+            if (scanf("%255s", save_filename) != 1) {
+                printf("Error reading filename\n");
+                break;
+            }
+
+            // Clear input buffer
+            while ((c = getchar()) != '\n' && c != EOF);
+
+            file = fopen(save_filename, "w");
+            if (!file) {
+                perror("Error opening file for writing");
+                break;
+            }
+
+            // Write header
+            for (int j = 0; j < header.field_count; j++) {
+                fprintf(file, "%s%s", header.fields[j], j < header.field_count - 1 ? "," : "\n");
+            }
+
+            // Write data
+            for (int i = 0; i < record_count; i++) {
+                for (int j = 0; j < records[i].field_count; j++) {
+                    fprintf(file, "%s%s", records[i].fields[j], j < records[i].field_count - 1 ? "," : "\n");
+                }
+            }
+
+            fclose(file);
+            printf("Data saved to %s\n", save_filename);
+            break;
+
+        } else if (choice == 0) {
+            // -------------------------------
+            // ----- exiting the program -----
+            // -------------------------------
+            printf("Exiting program...\n");
+            return 0;
+
+        } else {
+            printf("Invalid choice. Please try again.\n");
+        }
+
+
     }
 
     return 0;
