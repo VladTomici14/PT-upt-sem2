@@ -1,0 +1,16 @@
+id,album_name,artist,release_year,genre,tracks,sales_millions,rating
+1,Thriller,Michael Jackson,1982,Pop,9,70.0,9.5
+2,Back in Black,AC/DC,1980,Hard Rock,10,50.0,9.0
+3,The Dark Side of the Moon,Pink Floyd,1973,Progressive Rock,10,45.0,9.7
+4,Abbey Road,The Beatles,1969,Rock,17,31.0,9.6
+5,Rumours,Fleetwood Mac,1977,Rock,11,40.0,9.3
+6,Nevermind,Nirvana,1991,Grunge,12,30.0,9.2
+7,OK Computer,Radiohead,1997,Alternative Rock,12,4.5,9.8
+8,Purple Rain,Prince,1984,Pop,9,25.0,9.0
+9,Random Access Memories,Daft Punk,2013,Electronic,13,3.8,8.9
+10,Sgt. Pepper's Lonely Hearts Club Band,The Beatles,1967,Rock,13,32.0,9.8
+11,Born to Run,Bruce Springsteen,1975,Rock,8,9.0,9.4
+12,Kind of Blue,Miles Davis,1959,Jazz,5,5.0,9.9
+13,Blonde on Blonde,Bob Dylan,1966,Folk Rock,14,2.0,9.5
+14,The Miseducation of Lauryn Hill,Lauryn Hill,1998,R&B,16,20.0,9.0
+15,Appetite for Destruction,Guns N' Roses,1987,Hard Rock,12,30.0,9.1
