@@ -6,7 +6,7 @@
 #define MAX_LINE_LENGTH 1024
 #define MAX_TITLE_LENGTH 256
 
-// Structure for a movie node in the linked list
+// -----
 typedef struct MovieNode {
     int year;
     char* title;
@@ -249,14 +249,198 @@ void print_list(const MovieNode* head) {
     }
 }
 
+// ------------------------------
+// ----- SEARCHING FUNCTION -----
+// ------------------------------
+
+// Function to search movies by year
+void search_by_year(const MovieNode* head, int year) {
+    const MovieNode* current = head;
+    int found = 0;
+
+    printf("\nMovies released in %d:\n", year);
+    printf("----------------------------------------------------------------------\n");
+
+    while (current != NULL) {
+        if (current->year == year) {
+            char budget_str[32];
+            if (current->budget >= 1000000) {
+                sprintf(budget_str, "$%.2f million", current->budget / 1000000.0);
+            } else if (current->budget > 0) {
+                sprintf(budget_str, "$%.2f", current->budget);
+            } else {
+                strcpy(budget_str, "N/A");
+            }
+
+            printf("%-50.50s %s\n", current->title, budget_str);
+            found = 1;
+        }
+        current = current->next;
+    }
+
+    if (!found) {
+        printf("No movies found for year %d\n", year);
+    }
+}
+
+
+// Function to search movies by title (partial match)
+void search_by_title(const MovieNode* head, const char* search_term) {
+    const MovieNode* current = head;
+    int found = 0;
+
+    printf("\nMovies with title containing \"%s\":\n", search_term);
+    printf("----------------------------------------------------------------------\n");
+
+    while (current != NULL) {
+        // Case-insensitive search
+        if (strcasestr(current->title, search_term) != NULL) {
+            char budget_str[32];
+            if (current->budget >= 1000000) {
+                sprintf(budget_str, "$%.2f million", current->budget / 1000000.0);
+            } else if (current->budget > 0) {
+                sprintf(budget_str, "$%.2f", current->budget);
+            } else {
+                strcpy(budget_str, "N/A");
+            }
+
+            printf("%-7d %-50.50s %s\n",
+                   current->year,
+                   current->title,
+                   budget_str);
+            found = 1;
+        }
+        current = current->next;
+    }
+
+    if (!found) {
+        printf("No movies found with \"%s\" in the title\n", search_term);
+    }
+}
+
+// -------------------------------
+// ----- COMPUTING FUNCTIONS -----
+// -------------------------------
+
+// Function to find average budget by year range
+void average_budget_by_year_range(const MovieNode* head, int start_year, int end_year) {
+    const MovieNode* current = head;
+    double total_budget = 0.0;
+    int count = 0;
+
+    while (current != NULL) {
+        if (current->year >= start_year && current->year <= end_year && current->budget > 0) {
+            total_budget += current->budget;
+            count++;
+        }
+        current = current->next;
+    }
+
+    printf("\nAverage budget for movies between %d and %d:\n", start_year, end_year);
+    if (count > 0) {
+        double average = total_budget / count;
+        if (average >= 1000000) {
+            printf("$%.2f million (based on %d movies)\n", average / 1000000.0, count);
+        } else {
+            printf("$%.2f (based on %d movies)\n", average, count);
+        }
+    } else {
+        printf("No movies with budget information found for this period\n");
+    }
+}
+
+// Function to count movies per decade
+void count_movies_per_decade(const MovieNode* head) {
+    const MovieNode* current = head;
+    int decades[15] = {0}; // For decades from 1900s to 2040s
+    int min_decade = 21;   // Initialize to a high value
+    int max_decade = 0;    // Initialize to a low value
+
+    while (current != NULL) {
+        int decade = current->year / 10;
+        int decade_index = decade - 190; // Adjust for array index (1900s -> 0)
+
+        if (decade_index >= 0 && decade_index < 15) {
+            decades[decade_index]++;
+            if (decade_index < min_decade) min_decade = decade_index;
+            if (decade_index > max_decade) max_decade = decade_index;
+        }
+        current = current->next;
+    }
+
+    printf("\nMovies per decade:\n");
+    printf("----------------------------------------------------------------------\n");
+
+    for (int i = min_decade; i <= max_decade; i++) {
+        int decade_year = 1900 + (i * 10);
+        printf("%ds: %d movies\n", decade_year, decades[i]);
+    }
+}
+
 int main() {
 
+    int current_choice = 0;
     MovieNode* movie_list = parse_csv_file("inputData/movies.csv");
 
-    // Print the sorted list
-    print_list(movie_list);
+    while (1) {
+        printf("\n[MENU]\n");
+        printf("1. Display all movies (sorted by year and title)\n");
+        printf("2. Search movies by year\n");
+        printf("3. Search movies by title\n");
+        printf("4. Calculate average budget by year range\n");
+        printf("5. Count movies per decade\n");
+        printf("0. Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &current_choice);
 
-    // Free all allocated memory
+        if (current_choice == 1) {
+            printf("\n=== All Movies (Sorted by Year and Title) ===\n");
+            print_list(movie_list);
+
+        } else if (current_choice == 2) {
+            // --- reading the year data from the user ---
+            int year;
+            scanf("%d", &year);
+
+            // --- calling the search by year function ---
+            search_by_year(movie_list, year);
+
+        } else if (current_choice == 3) {
+            // --- reading title data from the user ---
+            char title[MAX_TITLE_LENGTH];
+            scanf("%s", title);
+
+            // --- removing newline character from title ---
+            title[strcspn(title, "\n")] = 0;
+
+            // --- calling the search by title function ---
+            search_by_title(movie_list, title);
+
+        } else if (current_choice == 4) {
+            // --- reading the year range data from the user ---
+            int start_year, end_year;
+            printf("Enter start year: ");
+            scanf("%d", &start_year);
+
+            printf("Enter end year: ");
+            scanf("%d", &end_year);
+
+            // --- calling the average budget by year range function ---
+            average_budget_by_year_range(movie_list, start_year, end_year);
+
+        } else if (current_choice == 5) {
+            // --- calling the count movies per decade function ---
+            count_movies_per_decade(movie_list);
+
+        } else if (current_choice == 0) {
+            printf("Exiting...\n");
+            break;
+        } else {
+            printf("Invalid choice. Please try again.\n");
+        }
+    }
+
+    // ----- free all allocated memory -----
     free_list(movie_list);
 
     return EXIT_SUCCESS;
